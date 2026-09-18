@@ -3,12 +3,17 @@ import type { User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import type { Profile } from './types';
 
+interface AuthResult {
+  error: string | null;
+  needsConfirmation: boolean;
+}
+
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, fullName: string) => Promise<AuthResult>;
+  signIn: (email: string, password: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -56,28 +61,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, [loadProfile]);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (email: string, password: string, fullName: string): Promise<AuthResult> => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: fullName } },
     });
-    if (error) return { error: error.message };
-    if (data.user) {
-      setUser(data.user);
-      await loadProfile(data.user.id);
+    if (error) return { error: error.message, needsConfirmation: false };
+
+    if (data.user && !data.session) {
+      return { error: null, needsConfirmation: true };
     }
-    return { error: null };
+
+    if (data.session) {
+      setUser(data.user);
+      if (data.user) {
+        await loadProfile(data.user.id);
+      }
+    }
+    return { error: null, needsConfirmation: false };
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<AuthResult> => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: error.message };
+    if (error) return { error: error.message, needsConfirmation: false };
     if (data.user) {
       setUser(data.user);
       await loadProfile(data.user.id);
     }
-    return { error: null };
+    return { error: null, needsConfirmation: false };
   };
 
   const signOut = async () => {
