@@ -7,7 +7,6 @@ const corsHeaders = {
 };
 
 const GEMINI_MODEL = "gemini-2.0-flash";
-const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
 
 interface GenerateRequest {
   prompt: string;
@@ -20,13 +19,6 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    if (!GEMINI_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "Gemini API key not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -35,14 +27,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: { headers: { Authorization: authHeader } },
-        auth: { persistSession: false, autoRefreshToken: false },
-      }
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
 
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) {
@@ -83,6 +74,31 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Read Gemini API key from app_settings table (service role bypasses RLS)
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    let geminiApiKey = Deno.env.get("GEMINI_API_KEY") ?? "";
+
+    if (!geminiApiKey && serviceRoleKey) {
+      const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { data: setting } = await adminClient
+        .from("app_settings")
+        .select("value")
+        .eq("key", "gemini_api_key")
+        .maybeSingle();
+      if (setting?.value) {
+        geminiApiKey = setting.value;
+      }
+    }
+
+    if (!geminiApiKey) {
+      return new Response(
+        JSON.stringify({ error: "Gemini API key not configured. Please add it in Admin Dashboard > Settings." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const systemInstruction = `You are an expert web developer. Generate a complete, single-file HTML document based on the user's request.
 
 Rules:
@@ -102,7 +118,7 @@ Rules:
       ? `Template type: ${templateType}\n\nUser request: ${prompt}`
       : `User request: ${prompt}`;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiApiKey}`;
 
     const geminiResponse = await fetch(geminiUrl, {
       method: "POST",
