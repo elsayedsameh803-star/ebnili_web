@@ -1,0 +1,3 @@
+[functions.generate-app]
+verify_jwt = true
+entrypoint = "./functions/generate-app/index.ts"
