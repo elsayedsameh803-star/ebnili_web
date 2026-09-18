@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Receipt, Check, Clock, X, Loader2, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { PRICING, type Transaction, type TransactionStatus } from '@/lib/types';
+import { useAuth } from '@/lib/auth';
 
 interface TransactionHistoryProps {
   onBack: () => void;
@@ -9,24 +10,27 @@ interface TransactionHistoryProps {
 }
 
 export default function TransactionHistory({ onBack, onManageSubscription }: TransactionHistoryProps) {
+  const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadTransactions();
-  }, []);
-
-  const loadTransactions = async () => {
+  const loadTransactions = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
     if (!error && data) {
       setTransactions(data as Transaction[]);
     }
     setLoading(false);
-  };
+  }, [user]);
+
+  useEffect(() => {
+    loadTransactions();
+  }, [loadTransactions]);
 
   const statusConfig: Record<TransactionStatus, { icon: React.ComponentType<{ size?: number | string; className?: string }>; color: string; bg: string; label: string }> = {
     verified: { icon: Check, color: 'text-green-600', bg: 'bg-green-50 border-green-200', label: 'Verified' },
@@ -36,17 +40,14 @@ export default function TransactionHistory({ onBack, onManageSubscription }: Tra
 
   return (
     <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
-      <div className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between">
+      <div className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-500"
-          >
+          <button onClick={onBack} className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-500">
             <ArrowLeft size={18} />
           </button>
           <div>
             <h2 className="text-lg font-bold text-slate-900">Transaction History</h2>
-            <p className="text-xs text-slate-500">Orange Cash payment records and status</p>
+            <p className="text-xs text-slate-500">Your Orange Cash payment records</p>
           </div>
         </div>
         <button

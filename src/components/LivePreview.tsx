@@ -1,16 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import {
-  Smartphone,
-  Tablet,
-  Monitor,
-  Code2,
-  Eye,
-  Download,
-  Copy,
-  Check,
-  Share2,
-  RotateCcw,
-} from 'lucide-react';
+import { Smartphone, Tablet, Monitor, Code2, Eye, Download, Copy, Check, Share2, RotateCcw } from 'lucide-react';
 import JSZip from 'jszip';
 
 interface LivePreviewProps {
@@ -34,7 +23,7 @@ export default function LivePreview({ code, onReset }: LivePreviewProps) {
   const [shared, setShared] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const srcDoc = useMemo(() => code || '<!DOCTYPE html><html><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f8fafc;color:#94a3b8;"><p>Your preview will appear here</p></body></html>', [code]);
+  const srcDoc = useMemo(() => code || '<!DOCTYPE html><html><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f8fafc;color:#94a3b8;"><div style="text-center"><p style="font-size:18px;margin-bottom:8px;">Live Preview</p><p style="font-size:13px;">Your generated app will appear here</p></div></body></html>', [code]);
 
   useEffect(() => {
     if (iframeRef.current) {
@@ -74,8 +63,8 @@ export default function LivePreview({ code, onReset }: LivePreviewProps) {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-100 min-w-0">
-      <div className="flex items-center justify-between px-4 py-2.5 bg-white border-b border-slate-200 gap-2">
+    <div className="flex-1 flex flex-col bg-slate-100 min-w-0 h-full">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-white border-b border-slate-200 gap-2 shrink-0">
         <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
           {(['mobile', 'tablet', 'desktop'] as Viewport[]).map((vp) => {
             const Icon = vp === 'mobile' ? Smartphone : vp === 'tablet' ? Tablet : Monitor;
@@ -83,9 +72,7 @@ export default function LivePreview({ code, onReset }: LivePreviewProps) {
               <button
                 key={vp}
                 onClick={() => setViewport(vp)}
-                className={`p-1.5 rounded-md transition-all ${
-                  viewport === vp ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400 hover:text-slate-600'
-                }`}
+                className={`p-1.5 rounded-md transition-all ${viewport === vp ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
                 title={vp}
               >
                 <Icon size={16} />
@@ -97,58 +84,31 @@ export default function LivePreview({ code, onReset }: LivePreviewProps) {
         <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
           <button
             onClick={() => setViewMode('preview')}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-              viewMode === 'preview' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400 hover:text-slate-600'
-            }`}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${viewMode === 'preview' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
           >
-            <Eye size={14} />
-            Preview
+            <Eye size={14} /> Preview
           </button>
           <button
             onClick={() => setViewMode('code')}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-              viewMode === 'code' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400 hover:text-slate-600'
-            }`}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${viewMode === 'code' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
           >
-            <Code2 size={14} />
-            Code
+            <Code2 size={14} /> Code
           </button>
         </div>
 
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={handleCopy}
-            disabled={!code}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-colors"
-            title="Copy code"
-          >
+          <button onClick={handleCopy} disabled={!code} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-colors" title="Copy code">
             {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
             {copied ? 'Copied' : 'Copy'}
           </button>
-          <button
-            onClick={handleShare}
-            disabled={!code}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-colors"
-            title="Share"
-          >
+          <button onClick={handleShare} disabled={!code} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-colors" title="Share">
             {shared ? <Check size={14} className="text-green-500" /> : <Share2 size={14} />}
-            {shared ? 'Link Copied' : 'Share'}
+            {shared ? 'Copied' : 'Share'}
           </button>
-          <button
-            onClick={handleDownload}
-            disabled={!code}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-slate-900 hover:bg-orange-500 disabled:opacity-40 transition-colors"
-            title="Export ZIP"
-          >
-            <Download size={14} />
-            Export ZIP
+          <button onClick={handleDownload} disabled={!code} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-slate-900 hover:bg-orange-500 disabled:opacity-40 transition-colors" title="Export ZIP">
+            <Download size={14} /> ZIP
           </button>
-          <button
-            onClick={onReset}
-            disabled={!code}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-colors"
-            title="Reset preview"
-          >
+          <button onClick={onReset} disabled={!code} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-colors" title="Reset">
             <RotateCcw size={14} />
           </button>
         </div>
@@ -156,19 +116,12 @@ export default function LivePreview({ code, onReset }: LivePreviewProps) {
 
       <div className="flex-1 overflow-auto flex items-start justify-center p-4">
         {viewMode === 'preview' ? (
-          <div
-            className="bg-white rounded-lg shadow-lg transition-all duration-300 overflow-hidden"
-            style={{
-              width: VIEWPORT_WIDTHS[viewport],
-              maxWidth: '100%',
-              minHeight: '100%',
-            }}
-          >
+          <div className="bg-white rounded-lg shadow-lg transition-all duration-300 overflow-hidden w-full" style={{ maxWidth: VIEWPORT_WIDTHS[viewport], minHeight: '100%' }}>
             <iframe
               ref={iframeRef}
               title="Live Preview"
               className="w-full border-0"
-              style={{ minHeight: 'calc(100vh - 140px)', height: '100%' }}
+              style={{ minHeight: 'calc(100vh - 200px)', height: '100%' }}
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
             />
           </div>

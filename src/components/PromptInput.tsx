@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Sparkles, ChevronDown } from 'lucide-react';
-import type { Template } from '@/lib/types';
+import { Send, Loader2, Sparkles, ChevronDown, Zap } from 'lucide-react';
+import type { Template, Profile } from '@/lib/types';
 
 interface PromptInputProps {
   onGenerate: (prompt: string) => void;
@@ -8,6 +8,7 @@ interface PromptInputProps {
   streamStatus: string;
   selectedTemplate: Template | null;
   onClearTemplate: () => void;
+  profile: Profile | null;
 }
 
 const SUGGESTIONS = [
@@ -17,13 +18,7 @@ const SUGGESTIONS = [
   'Make a portfolio website with projects gallery',
 ];
 
-export default function PromptInput({
-  onGenerate,
-  isGenerating,
-  streamStatus,
-  selectedTemplate,
-  onClearTemplate,
-}: PromptInputProps) {
+export default function PromptInput({ onGenerate, isGenerating, streamStatus, selectedTemplate, onClearTemplate, profile }: PromptInputProps) {
   const [prompt, setPrompt] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -48,23 +43,32 @@ export default function PromptInput({
     }
   };
 
+  const credits = profile?.credits ?? 0;
+  const isPro = profile?.subscription_tier === 'pro';
+  const hasCredits = isPro || credits > 0;
+
   return (
-    <div className="border-b border-slate-200 bg-white">
+    <div className="border-b border-slate-200 bg-white shrink-0">
       <div className="px-6 py-4">
-        {selectedTemplate && selectedTemplate.category !== 'blank' && (
-          <div className="mb-3 flex items-center gap-2">
+        <div className="flex items-center gap-2 mb-3">
+          {selectedTemplate && selectedTemplate.category !== 'blank' && (
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full">
               <Sparkles size={12} />
               {selectedTemplate.name}
             </span>
-            <button
-              onClick={onClearTemplate}
-              className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
-            >
+          )}
+          <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${
+            isPro ? 'text-orange-600 bg-orange-50' : credits > 0 ? 'text-blue-600 bg-blue-50' : 'text-red-600 bg-red-50'
+          }`}>
+            <Zap size={12} />
+            {isPro ? 'Unlimited' : `${credits} credits left`}
+          </span>
+          {selectedTemplate && selectedTemplate.category !== 'blank' && (
+            <button onClick={onClearTemplate} className="text-xs text-slate-400 hover:text-slate-600 transition-colors">
               Clear
             </button>
-          </div>
-        )}
+          )}
+        </div>
 
         <div className="relative">
           <textarea
@@ -72,14 +76,14 @@ export default function PromptInput({
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Describe the web app you want to build..."
+            placeholder={hasCredits ? "Describe the web app you want to build..." : "No credits left. Upgrade to continue building."}
             rows={1}
-            disabled={isGenerating}
+            disabled={isGenerating || !hasCredits}
             className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 pr-14 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-400 focus:bg-white transition-all disabled:opacity-60"
           />
           <button
             onClick={handleSubmit}
-            disabled={!prompt.trim() || isGenerating}
+            disabled={!prompt.trim() || isGenerating || !hasCredits}
             className="absolute right-2.5 bottom-2.5 w-9 h-9 rounded-lg bg-slate-900 text-white flex items-center justify-center hover:bg-orange-500 disabled:opacity-30 disabled:hover:bg-slate-900 transition-all shrink-0"
             title="Generate (Cmd/Ctrl + Enter)"
           >
@@ -88,16 +92,14 @@ export default function PromptInput({
         </div>
 
         <div className="flex items-center justify-between mt-2.5">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowSuggestions(!showSuggestions)}
-              className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 transition-colors"
-            >
-              <Sparkles size={12} />
-              Suggestions
-              <ChevronDown size={12} className={`transition-transform ${showSuggestions ? 'rotate-180' : ''}`} />
-            </button>
-          </div>
+          <button
+            onClick={() => setShowSuggestions(!showSuggestions)}
+            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 transition-colors"
+          >
+            <Sparkles size={12} />
+            Suggestions
+            <ChevronDown size={12} className={`transition-transform ${showSuggestions ? 'rotate-180' : ''}`} />
+          </button>
           <span className="text-[11px] text-slate-400">⌘ + Enter to generate</span>
         </div>
 

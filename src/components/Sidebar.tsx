@@ -11,12 +11,15 @@ import {
   PanelLeft,
   FileCode,
   Trash2,
+  Zap,
+  Crown,
+  Shield,
 } from 'lucide-react';
-import { TEMPLATES, type Template, type Project, type ProjectVersion } from '@/lib/types';
+import { TEMPLATES, type Template, type Project, type ProjectVersion, type Profile } from '@/lib/types';
 
 interface SidebarProps {
-  activeView: 'builder' | 'subscription' | 'transactions';
-  onViewChange: (view: 'builder' | 'subscription' | 'transactions') => void;
+  activeView: 'builder' | 'subscription' | 'transactions' | 'admin';
+  onViewChange: (view: 'builder' | 'subscription' | 'transactions' | 'admin') => void;
   selectedTemplate: Template | null;
   onTemplateSelect: (template: Template) => void;
   projects: Project[];
@@ -27,6 +30,8 @@ interface SidebarProps {
   onDeleteProject: (id: string) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  profile: Profile | null;
+  onSignOut: () => void;
 }
 
 const iconMap: Record<string, React.ComponentType<{ size?: number | string; className?: string }>> = {
@@ -49,17 +54,15 @@ export default function Sidebar({
   onDeleteProject,
   collapsed,
   onToggleCollapse,
+  profile,
+  onSignOut,
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<'templates' | 'history'>('templates');
 
   if (collapsed) {
     return (
-      <div className="w-16 bg-slate-900 flex flex-col items-center py-4 gap-6 border-r border-slate-800 shrink-0">
-        <button
-          onClick={onToggleCollapse}
-          className="text-slate-400 hover:text-white transition-colors"
-          title="Expand sidebar"
-        >
+      <div className="w-16 bg-slate-900 flex flex-col items-center py-4 gap-4 border-r border-slate-800 shrink-0">
+        <button onClick={onToggleCollapse} className="text-slate-400 hover:text-white transition-colors" title="Expand">
           <PanelLeft size={20} />
         </button>
         <button
@@ -83,6 +86,19 @@ export default function Sidebar({
         >
           <Receipt size={20} />
         </button>
+        {profile?.role === 'admin' && (
+          <button
+            onClick={() => onViewChange('admin')}
+            className={`p-2 rounded-lg transition-colors ${activeView === 'admin' ? 'bg-orange-500 text-white' : 'text-slate-400 hover:text-white'}`}
+            title="Admin Dashboard"
+          >
+            <Shield size={20} />
+          </button>
+        )}
+        <div className="flex-1" />
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white text-xs font-bold">
+          {profile?.email?.[0]?.toUpperCase() || 'U'}
+        </div>
       </div>
     );
   }
@@ -99,15 +115,47 @@ export default function Sidebar({
             <p className="text-slate-500 text-[10px] mt-0.5">ابنيلي · AI Builder</p>
           </div>
         </div>
-        <button
-          onClick={onToggleCollapse}
-          className="text-slate-400 hover:text-white transition-colors"
-          title="Collapse sidebar"
-        >
+        <button onClick={onToggleCollapse} className="text-slate-400 hover:text-white transition-colors" title="Collapse">
           <PanelLeftClose size={18} />
         </button>
       </div>
 
+      {/* User info + credits */}
+      <div className="px-4 py-3 border-b border-slate-800">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white text-sm font-bold shrink-0">
+            {profile?.email?.[0]?.toUpperCase() || 'U'}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-white truncate">{profile?.full_name || 'User'}</p>
+            <p className="text-[11px] text-slate-500 truncate">{profile?.email}</p>
+          </div>
+        </div>
+        <div className="mt-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            {profile?.subscription_tier === 'pro' ? (
+              <span className="flex items-center gap-1 text-[11px] font-semibold text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full">
+                <Crown size={11} /> PRO
+              </span>
+            ) : profile?.subscription_tier === 'starter' ? (
+              <span className="flex items-center gap-1 text-[11px] font-semibold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full">
+                <Zap size={11} /> Starter
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
+                <Zap size={11} /> Free
+              </span>
+            )}
+            {profile?.subscription_tier !== 'pro' && (
+              <span className="text-[11px] text-slate-500">
+                {profile?.credits ?? 0} credits
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
       <div className="flex gap-1 px-3 pt-3">
         <button
           onClick={() => setActiveTab('templates')}
@@ -138,21 +186,15 @@ export default function Sidebar({
                   key={template.id}
                   onClick={() => onTemplateSelect(template)}
                   className={`w-full text-left p-3 rounded-xl transition-all border ${
-                    isActive
-                      ? 'bg-slate-800 border-orange-500/50'
-                      : 'bg-slate-800/50 border-transparent hover:bg-slate-800 hover:border-slate-700'
+                    isActive ? 'bg-slate-800 border-orange-500/50' : 'bg-slate-800/50 border-transparent hover:bg-slate-800 hover:border-slate-700'
                   }`}
                 >
                   <div className="flex items-start gap-3">
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                      isActive ? 'bg-orange-500/20' : 'bg-slate-700/50'
-                    }`}>
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${isActive ? 'bg-orange-500/20' : 'bg-slate-700/50'}`}>
                       <Icon size={18} className={isActive ? 'text-orange-400' : 'text-slate-400'} />
                     </div>
                     <div className="min-w-0">
-                      <p className={`text-sm font-semibold ${isActive ? 'text-white' : 'text-slate-300'}`}>
-                        {template.name}
-                      </p>
+                      <p className={`text-sm font-semibold ${isActive ? 'text-white' : 'text-slate-300'}`}>{template.name}</p>
                       <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">{template.description}</p>
                     </div>
                   </div>
@@ -165,7 +207,7 @@ export default function Sidebar({
               {projects.length === 0 ? (
                 <p className="text-xs text-slate-600 px-1 py-2">No projects yet</p>
               ) : (
-                projects.slice(0, 8).map((project) => (
+                projects.slice(0, 10).map((project) => (
                   <div
                     key={project.id}
                     className={`group flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
@@ -199,7 +241,7 @@ export default function Sidebar({
                 <button
                   key={version.id}
                   onClick={() => onVersionSelect(version)}
-                  className="w-full text-left p-2.5 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors group"
+                  className="w-full text-left p-2.5 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors"
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-semibold text-slate-300">{version.version_label}</span>
@@ -209,9 +251,7 @@ export default function Sidebar({
                   </div>
                   <p className="text-[11px] text-slate-500 truncate">{version.prompt}</p>
                   {idx === 0 && (
-                    <span className="inline-block mt-1.5 text-[9px] font-bold text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded">
-                      LATEST
-                    </span>
+                    <span className="inline-block mt-1.5 text-[9px] font-bold text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded">LATEST</span>
                   )}
                 </button>
               ))
@@ -227,8 +267,7 @@ export default function Sidebar({
             activeView === 'builder' ? 'bg-orange-500 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'
           }`}
         >
-          <Sparkles size={16} />
-          Builder
+          <Sparkles size={16} /> Builder
         </button>
         <button
           onClick={() => onViewChange('subscription')}
@@ -236,8 +275,7 @@ export default function Sidebar({
             activeView === 'subscription' ? 'bg-orange-500 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'
           }`}
         >
-          <CreditCard size={16} />
-          Subscription
+          <CreditCard size={16} /> Subscription
         </button>
         <button
           onClick={() => onViewChange('transactions')}
@@ -245,8 +283,23 @@ export default function Sidebar({
             activeView === 'transactions' ? 'bg-orange-500 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'
           }`}
         >
-          <Receipt size={16} />
-          Transactions
+          <Receipt size={16} /> Transactions
+        </button>
+        {profile?.role === 'admin' && (
+          <button
+            onClick={() => onViewChange('admin')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              activeView === 'admin' ? 'bg-orange-500 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Shield size={16} /> Admin Panel
+          </button>
+        )}
+        <button
+          onClick={onSignOut}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors"
+        >
+          <PanelLeft size={16} /> Sign Out
         </button>
       </div>
     </div>

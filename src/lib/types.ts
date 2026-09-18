@@ -1,9 +1,21 @@
+export interface Profile {
+  id: string;
+  email: string;
+  full_name: string;
+  role: 'user' | 'admin';
+  credits: number;
+  subscription_tier: 'free' | 'starter' | 'pro';
+  avatar_url: string | null;
+  created_at: string;
+}
+
 export interface Project {
   id: string;
   name: string;
   prompt: string;
   code: string;
   template_type: string;
+  user_id: string;
   created_at: string;
   updated_at: string;
 }
@@ -17,7 +29,7 @@ export interface ProjectVersion {
   created_at: string;
 }
 
-export type SubscriptionTier = 'starter' | 'pro';
+export type SubscriptionTier = 'free' | 'starter' | 'pro';
 export type SubscriptionStatus = 'active' | 'inactive';
 
 export interface Subscription {
@@ -25,6 +37,7 @@ export interface Subscription {
   tier: SubscriptionTier;
   status: SubscriptionStatus;
   sender_mobile: string | null;
+  user_id: string;
   activated_at: string | null;
   created_at: string;
 }
@@ -34,6 +47,7 @@ export type TransactionStatus = 'pending' | 'verified' | 'rejected';
 export interface Transaction {
   id: string;
   subscription_id: string | null;
+  user_id: string;
   sender_mobile: string;
   receipt_code: string;
   amount: number;
@@ -88,8 +102,9 @@ export const TEMPLATES: Template[] = [
 ];
 
 export const PRICING = {
-  starter: { price: 99, currency: 'EGP', name: 'Starter' },
-  pro: { price: 199, currency: 'EGP', name: 'PRO' },
+  free: { price: 0, currency: 'EGP', name: 'Free', credits: 3 },
+  starter: { price: 99, currency: 'EGP', name: 'Starter', credits: 100 },
+  pro: { price: 199, currency: 'EGP', name: 'PRO', credits: -1 },
 };
 
 export const ORANGE_CASH_NUMBER = '01207782741';
