@@ -45,7 +45,7 @@ export default function PromptInput({ onGenerate, isGenerating, streamStatus, se
 
   const credits = profile?.credits ?? 0;
   const isPro = profile?.subscription_tier === 'pro';
-  const hasCredits = isPro || credits > 0;
+  const hasCredits = !profile || isPro || credits > 0;
 
   return (
     <div className="border-b border-slate-200 bg-white shrink-0">
@@ -57,12 +57,14 @@ export default function PromptInput({ onGenerate, isGenerating, streamStatus, se
               {selectedTemplate.name}
             </span>
           )}
-          <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${
-            isPro ? 'text-orange-600 bg-orange-50' : credits > 0 ? 'text-blue-600 bg-blue-50' : 'text-red-600 bg-red-50'
-          }`}>
-            <Zap size={12} />
-            {isPro ? 'Unlimited' : `${credits} credits left`}
-          </span>
+          {profile && (
+            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${
+              isPro ? 'text-orange-600 bg-orange-50' : credits > 0 ? 'text-blue-600 bg-blue-50' : 'text-red-600 bg-red-50'
+            }`}>
+              <Zap size={12} />
+              {isPro ? 'Unlimited' : `${credits} credits left`}
+            </span>
+          )}
           {selectedTemplate && selectedTemplate.category !== 'blank' && (
             <button onClick={onClearTemplate} className="text-xs text-slate-400 hover:text-slate-600 transition-colors">
               Clear

@@ -36,21 +36,22 @@ export async function streamGenerate(
   const { data: sessionData } = await supabase.auth.getSession();
   const accessToken = sessionData?.session?.access_token;
 
-  if (!accessToken) {
-    throw new Error('Not authenticated');
-  }
-
   const templateType = template && template.category !== 'blank' ? template.category : undefined;
 
   callbacks.onStatus('Calling AI engine');
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'apikey': supabaseAnonKey,
+  };
+
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+
   const response = await fetch(`${supabaseUrl}/functions/v1/generate-app`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${accessToken}`,
-      'apikey': supabaseAnonKey,
-    },
+    headers,
     body: JSON.stringify({ prompt, templateType }),
   });
 

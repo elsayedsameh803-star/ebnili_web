@@ -19,63 +19,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("credits, subscription_tier, role")
-      .eq("id", userData.user.id)
-      .maybeSingle();
-
-    if (!profile) {
-      return new Response(
-        JSON.stringify({ error: "Profile not found" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const isPro = profile.subscription_tier === "pro";
-    if (!isPro && profile.credits <= 0) {
-      return new Response(
-        JSON.stringify({ error: "No credits remaining. Please upgrade your plan." }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const body: GenerateRequest = await req.json();
-    const { prompt, templateType } = body;
-
-    if (!prompt || !prompt.trim()) {
-      return new Response(
-        JSON.stringify({ error: "Prompt is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
     // Read Gemini API key from app_settings table (service role bypasses RLS)
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     let geminiApiKey = Deno.env.get("GEMINI_API_KEY") ?? "";
 
     if (!geminiApiKey && serviceRoleKey) {
@@ -96,6 +44,51 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ error: "Gemini API key not configured. Please add it in Admin Dashboard > Settings." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const body: GenerateRequest = await req.json();
+    const { prompt, templateType } = body;
+
+    if (!prompt || !prompt.trim()) {
+      return new Response(
+        JSON.stringify({ error: "Prompt is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Try to identify the user (optional - works without login too)
+    const authHeader = req.headers.get("Authorization");
+    let userId: string | null = null;
+    let isPro = false;
+    let credits = 0;
+
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+
+      const { data: userData } = await userClient.auth.getUser();
+      if (userData?.user) {
+        userId = userData.user.id;
+        const { data: profile } = await userClient
+          .from("profiles")
+          .select("credits, subscription_tier, role")
+          .eq("id", userData.user.id)
+          .maybeSingle();
+        if (profile) {
+          isPro = profile.subscription_tier === "pro";
+          credits = profile.credits;
+        }
+      }
+    }
+
+    // Check credits for logged-in free users
+    if (userId && !isPro && credits <= 0) {
+      return new Response(
+        JSON.stringify({ error: "No credits remaining. Please upgrade your plan." }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -172,11 +165,15 @@ Rules:
     }
     cleanCode = cleanCode.trim();
 
-    if (!isPro) {
-      await supabase
+    // Deduct credit for logged-in free users
+    if (userId && !isPro && serviceRoleKey) {
+      const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      await adminClient
         .from("profiles")
-        .update({ credits: profile.credits - 1 })
-        .eq("id", userData.user.id);
+        .update({ credits: credits - 1 })
+        .eq("id", userId);
     }
 
     return new Response(

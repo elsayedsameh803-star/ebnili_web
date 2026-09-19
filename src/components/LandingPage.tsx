@@ -157,7 +157,7 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
           </p>
           <div className="flex items-center justify-center gap-4 flex-wrap">
             <button
-              onClick={() => onNavigate(user ? 'builder' : 'signup')}
+              onClick={() => onNavigate('builder')}
               className="group flex items-center gap-2 px-7 py-3.5 rounded-xl bg-slate-900 text-white font-semibold hover:bg-orange-500 transition-all hover:scale-105 shadow-lg shadow-slate-900/10"
             >
               Start Building Free
@@ -320,7 +320,7 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                     ))}
                   </ul>
                   <button
-                    onClick={() => onNavigate(user ? 'builder' : 'signup')}
+                    onClick={() => onNavigate('builder')}
                     className={`w-full py-3 rounded-xl font-semibold text-sm transition-all ${
                       tier.popular
                         ? 'bg-orange-500 text-white hover:bg-orange-600'
@@ -375,7 +375,7 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                 Join thousands of creators using Ebnili to turn ideas into apps.
               </p>
               <button
-                onClick={() => onNavigate(user ? 'builder' : 'signup')}
+                onClick={() => onNavigate('builder')}
                 className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-orange-500 text-white font-semibold hover:bg-orange-600 transition-all hover:scale-105"
               >
                 Get Started for Free

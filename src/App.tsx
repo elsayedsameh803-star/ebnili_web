@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Crown, Sparkles, Loader2 } from 'lucide-react';
+import { Crown, Sparkles, Loader2, LogIn } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { streamGenerate } from '@/lib/generator';
-import type { Project, ProjectVersion, Subscription, Template } from '@/lib/types';
+import type { Project, ProjectVersion, Template } from '@/lib/types';
 
 import LandingPage from '@/components/LandingPage';
 import AuthPage from '@/components/AuthPage';
@@ -29,16 +29,13 @@ function AppContent() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [streamStatus, setStreamStatus] = useState('');
   const [showSubModal, setShowSubModal] = useState(false);
+  const [genError, setGenError] = useState('');
 
   useEffect(() => {
     if (loading) return;
     if (user) {
-      if (view === 'landing' || view === 'signin' || view === 'signup') {
+      if (view === 'signin' || view === 'signup') {
         setView('builder');
-      }
-    } else {
-      if (view !== 'landing' && view !== 'signin' && view !== 'signup') {
-        setView('landing');
       }
     }
   }, [user, loading, view]);
@@ -73,15 +70,17 @@ function AppContent() {
   }, [user, view, loadProjects]);
 
   const handleGenerate = async (prompt: string) => {
-    if (!user || !profile) return;
-    const isPro = profile.subscription_tier === 'pro';
-    if (!isPro && profile.credits <= 0) {
-      setShowSubModal(true);
-      return;
+    if (user && profile) {
+      const isPro = profile.subscription_tier === 'pro';
+      if (!isPro && profile.credits <= 0) {
+        setShowSubModal(true);
+        return;
+      }
     }
 
     setIsGenerating(true);
     setStreamStatus('Starting');
+    setGenError('');
 
     try {
       const code = await streamGenerate(prompt, selectedTemplate || undefined, {
@@ -90,46 +89,50 @@ function AppContent() {
 
       setPreviewCode(code);
 
-      const templateType = selectedTemplate?.category || 'landing-page';
-      const projectName = prompt.slice(0, 40) + (prompt.length > 40 ? '...' : '');
+      if (user && profile) {
+        const templateType = selectedTemplate?.category || 'landing-page';
+        const projectName = prompt.slice(0, 40) + (prompt.length > 40 ? '...' : '');
 
-      const { data: projectData, error: projectErr } = await supabase
-        .from('projects')
-        .insert({
-          name: projectName,
-          prompt,
-          code,
-          template_type: templateType,
-        })
-        .select()
-        .single();
+        const { data: projectData, error: projectErr } = await supabase
+          .from('projects')
+          .insert({
+            name: projectName,
+            prompt,
+            code,
+            template_type: templateType,
+          })
+          .select()
+          .single();
 
-      if (projectErr) throw projectErr;
+        if (projectErr) throw projectErr;
 
-      const newProject = projectData as Project;
-      setActiveProject(newProject);
-      setProjects((prev) => [newProject, ...prev]);
+        const newProject = projectData as Project;
+        setActiveProject(newProject);
+        setProjects((prev) => [newProject, ...prev]);
 
-      await supabase
-        .from('project_versions')
-        .insert({
-          project_id: newProject.id,
-          version_label: 'v1',
-          prompt,
-          code,
-        });
-
-      if (!isPro) {
         await supabase
-          .from('profiles')
-          .update({ credits: profile.credits - 1 })
-          .eq('id', user.id);
-        refreshProfile();
-      }
+          .from('project_versions')
+          .insert({
+            project_id: newProject.id,
+            version_label: 'v1',
+            prompt,
+            code,
+          });
 
-      await loadVersions(newProject.id);
+        const isPro = profile.subscription_tier === 'pro';
+        if (!isPro) {
+          await supabase
+            .from('profiles')
+            .update({ credits: profile.credits - 1 })
+            .eq('id', user.id);
+          refreshProfile();
+        }
+
+        await loadVersions(newProject.id);
+      }
     } catch (err) {
       console.error('Generation error:', err);
+      setGenError(err instanceof Error ? err.message : 'Generation failed');
     } finally {
       setIsGenerating(false);
       setStreamStatus('');
@@ -187,7 +190,7 @@ function AppContent() {
     );
   }
 
-  if (!user) {
+  if (!user && view !== 'builder') {
     if (view === 'signin') {
       return <AuthPage mode="signin" onBack={() => setView('landing')} onSuccess={() => setView('builder')} onSwitchMode={(m) => setView(m)} />;
     }
@@ -197,28 +200,55 @@ function AppContent() {
     return <LandingPage onNavigate={(v) => setView(v)} />;
   }
 
-  const effectiveSidebarView = view === 'builder' || view === 'subscription' || view === 'transactions' || view === 'admin' ? view : sidebarView;
+  const effectiveSidebarView = (view === 'builder' || view === 'subscription' || view === 'transactions' || view === 'admin') ? view : sidebarView;
 
   return (
     <div className="h-screen flex bg-slate-100 overflow-hidden">
-      <Sidebar
-        activeView={effectiveSidebarView as 'builder' | 'subscription' | 'transactions' | 'admin'}
-        onViewChange={(v) => { setSidebarView(v); setView(v); }}
-        selectedTemplate={selectedTemplate}
-        onTemplateSelect={setSelectedTemplate}
-        projects={projects}
-        activeProject={activeProject}
-        onProjectSelect={handleProjectSelect}
-        versions={versions}
-        onVersionSelect={handleVersionSelect}
-        onDeleteProject={handleDeleteProject}
-        collapsed={sidebarCollapsed}
-        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-        profile={profile}
-        onSignOut={handleSignOut}
-      />
+      {user && (
+        <Sidebar
+          activeView={effectiveSidebarView as 'builder' | 'subscription' | 'transactions' | 'admin'}
+          onViewChange={(v) => { setSidebarView(v); setView(v); }}
+          selectedTemplate={selectedTemplate}
+          onTemplateSelect={setSelectedTemplate}
+          projects={projects}
+          activeProject={activeProject}
+          onProjectSelect={handleProjectSelect}
+          versions={versions}
+          onVersionSelect={handleVersionSelect}
+          onDeleteProject={handleDeleteProject}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+          profile={profile}
+          onSignOut={handleSignOut}
+        />
+      )}
 
       <div className="flex-1 flex flex-col min-w-0">
+        {!user && view === 'builder' && (
+          <div className="flex items-center justify-between px-5 py-2.5 bg-gradient-to-r from-orange-50 to-amber-50 border-b border-orange-100 shrink-0">
+            <div className="flex items-center gap-2">
+              <Sparkles size={16} className="text-orange-500" />
+              <span className="text-sm font-medium text-slate-700">
+                You're trying Ebnili free — no account needed to generate and preview.
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setView('signup')}
+                className="flex items-center gap-1.5 text-xs font-semibold text-white bg-gradient-to-r from-orange-500 to-amber-500 px-3 py-1.5 rounded-full hover:opacity-90 transition-opacity"
+              >
+                <LogIn size={13} /> Sign up to save
+              </button>
+              <button
+                onClick={() => setView('landing')}
+                className="text-xs font-medium text-slate-500 hover:text-slate-700 px-2 py-1.5"
+              >
+                Back
+              </button>
+            </div>
+          </div>
+        )}
+
         {(effectiveSidebarView === 'builder') && (
           <>
             <div className="flex items-center justify-between px-5 py-2.5 bg-white border-b border-slate-200 shrink-0">
@@ -234,21 +264,27 @@ function AppContent() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                {profile?.subscription_tier !== 'free' && profile?.subscription_tier !== undefined ? (
+                {user && profile?.subscription_tier !== 'free' && profile?.subscription_tier !== undefined ? (
                   <span className="flex items-center gap-1.5 text-xs font-semibold text-orange-600 bg-orange-50 px-3 py-1.5 rounded-full">
                     <Crown size={13} />
                     {profile.subscription_tier.toUpperCase()}
                   </span>
-                ) : (
+                ) : user ? (
                   <button
                     onClick={() => setShowSubModal(true)}
                     className="flex items-center gap-1.5 text-xs font-semibold text-white bg-gradient-to-r from-orange-500 to-amber-500 px-3 py-1.5 rounded-full hover:opacity-90 transition-opacity"
                   >
                     <Crown size={13} /> Upgrade
                   </button>
-                )}
+                ) : null}
               </div>
             </div>
+
+            {genError && (
+              <div className="px-5 py-2 bg-red-50 border-b border-red-100 text-sm text-red-600">
+                {genError}
+              </div>
+            )}
 
             <PromptInput
               onGenerate={handleGenerate}
@@ -263,7 +299,7 @@ function AppContent() {
           </>
         )}
 
-        {effectiveSidebarView === 'subscription' && (
+        {user && effectiveSidebarView === 'subscription' && (
           <div className="flex-1 flex flex-col bg-slate-50 overflow-y-auto">
             <div className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
               <div>
@@ -322,18 +358,18 @@ function AppContent() {
           </div>
         )}
 
-        {effectiveSidebarView === 'transactions' && (
+        {user && effectiveSidebarView === 'transactions' && (
           <TransactionHistory
             onBack={() => { setSidebarView('builder'); setView('builder'); }}
             onManageSubscription={() => setShowSubModal(true)}
           />
         )}
 
-        {effectiveSidebarView === 'admin' && profile?.role === 'admin' && (
+        {user && effectiveSidebarView === 'admin' && profile?.role === 'admin' && (
           <AdminDashboard onBack={() => { setSidebarView('builder'); setView('builder'); }} />
         )}
 
-        {effectiveSidebarView === 'admin' && profile?.role !== 'admin' && (
+        {user && effectiveSidebarView === 'admin' && profile?.role !== 'admin' && (
           <div className="flex-1 flex items-center justify-center bg-slate-50">
             <p className="text-sm text-slate-400">Access denied. Admin role required.</p>
           </div>
