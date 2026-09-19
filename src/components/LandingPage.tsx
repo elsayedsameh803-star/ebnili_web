@@ -23,6 +23,7 @@ import {
   Github,
   Twitter,
   Layers,
+  ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { PRICING, ORANGE_CASH_NUMBER } from '@/lib/types';
@@ -35,6 +36,7 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
   const { user } = useAuth();
   const [mobileMenu, setMobileMenu] = useState(false);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const features = [
     { icon: Sparkles, title: 'AI-Powered Generation', desc: 'Describe your app in plain language and watch it come to life instantly.' },
@@ -49,7 +51,7 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
     { icon: ShoppingBag, name: 'E-Commerce', color: 'from-orange-500 to-amber-500' },
     { icon: Rocket, name: 'Landing Page', color: 'from-blue-500 to-cyan-500' },
     { icon: LayoutDashboard, name: 'Dashboard', color: 'from-green-500 to-emerald-500' },
-    { icon: Code2, name: 'Custom App', color: 'from-purple-500 to-pink-500' },
+    { icon: Code2, name: 'Custom App', color: 'from-slate-700 to-slate-900' },
   ];
 
   const tiers = [
@@ -183,16 +185,10 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
       <section className="py-12 px-6 border-y border-slate-100">
         <div className="max-w-5xl mx-auto text-center">
           <p className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-6">Trusted by builders everywhere</p>
-          <div className="flex items-center justify-center gap-8 flex-wrap opacity-60">
-            {[Star, Star, Star, Star, Star].map((_, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <div className="flex">
-                  {[1,2,3,4,5].map(s => <Star key={s} size={14} className="text-orange-400 fill-orange-400" />)}
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center justify-center gap-2 mb-3">
+            {[1,2,3,4,5].map(s => <Star key={s} size={20} className="text-orange-400 fill-orange-400" />)}
           </div>
-          <p className="text-sm text-slate-500 mt-3">Loved by 1,000+ creators</p>
+          <p className="text-sm text-slate-500 mt-3">Loved by 1,000+ creators across Egypt and the MENA region</p>
         </div>
       </section>
 
@@ -356,8 +352,16 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
               { q: 'What templates are available?', a: 'We offer e-commerce, landing page, and analytics dashboard templates, plus a blank canvas for custom projects.' },
             ].map((faq, i) => (
               <div key={i} className="p-5 rounded-xl border border-slate-100 bg-white">
-                <h3 className="font-semibold text-slate-900 mb-2">{faq.q}</h3>
-                <p className="text-sm text-slate-500 leading-relaxed">{faq.a}</p>
+                <button
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  className="flex items-center justify-between w-full text-left"
+                >
+                  <h3 className="font-semibold text-slate-900">{faq.q}</h3>
+                  <ChevronDown size={18} className={`text-slate-400 shrink-0 transition-transform ${openFaq === i ? 'rotate-180' : ''}`} />
+                </button>
+                {openFaq === i && (
+                  <p className="text-sm text-slate-500 leading-relaxed mt-2">{faq.a}</p>
+                )}
               </div>
             ))}
           </div>
