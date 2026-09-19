@@ -6,7 +6,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_MODELS = [
+  "gemini-3.5-flash-lite",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-2.0-flash-lite",
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+];
 
 interface GenerateRequest {
   prompt: string;
@@ -23,7 +32,6 @@ Deno.serve(async (req: Request) => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-    // Read Gemini API key from app_settings table (service role bypasses RLS)
     let geminiApiKey = Deno.env.get("GEMINI_API_KEY") ?? "";
 
     if (!geminiApiKey && serviceRoleKey) {
@@ -57,7 +65,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Try to identify the user (optional - works without login too)
     const authHeader = req.headers.get("Authorization");
     let userId: string | null = null;
     let isPro = false;
@@ -84,7 +91,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Check credits for logged-in free users
     if (userId && !isPro && credits <= 0) {
       return new Response(
         JSON.stringify({ error: "No credits remaining. Please upgrade your plan." }),
@@ -111,34 +117,75 @@ Rules:
       ? `Template type: ${templateType}\n\nUser request: ${prompt}`
       : `User request: ${prompt}`;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiApiKey}`;
+    const requestBody = {
+      system_instruction: { parts: [{ text: systemInstruction }] },
+      contents: [{ parts: [{ text: fullPrompt }] }],
+      generationConfig: {
+        temperature: 0.9,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 8192,
+      },
+    };
 
-    const geminiResponse = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: systemInstruction }],
-        },
-        contents: [
-          {
-            parts: [{ text: fullPrompt }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.9,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 8192,
-        },
-      }),
-    });
+    let geminiResponse: Response | null = null;
+    let lastError = "";
+    const allErrors: string[] = [];
 
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text();
-      console.error("Gemini API error:", errorText);
+    for (const model of GEMINI_MODELS) {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const res = await fetch(geminiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestBody),
+          });
+
+          if (res.ok) {
+            geminiResponse = res;
+            break;
+          }
+
+          const errorText = await res.text();
+          let modelError = "";
+          try {
+            const errJson = JSON.parse(errorText);
+            modelError = errJson?.error?.message ?? errorText;
+          } catch {
+            modelError = errorText;
+          }
+
+          if (attempt === 0) {
+            allErrors.push(`${model}: ${modelError}`);
+          }
+          lastError = modelError;
+          console.error(`Model ${model} attempt ${attempt + 1} failed:`, modelError);
+
+          if (modelError.includes("API key not valid")) {
+            break;
+          }
+
+          if (modelError.includes("high demand") && attempt === 0) {
+            await new Promise((r) => setTimeout(r, 3000));
+            continue;
+          }
+          break;
+        } catch (fetchErr) {
+          const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+          allErrors.push(`${model}: ${msg}`);
+          lastError = msg;
+          console.error(`Model ${model} fetch error:`, msg);
+          break;
+        }
+      }
+      if (geminiResponse) break;
+    }
+
+    if (!geminiResponse) {
       return new Response(
-        JSON.stringify({ error: "Failed to generate code. Please try again." }),
+        JSON.stringify({ error: `AI generation failed. Tried ${allErrors.length} models: ${allErrors.join(" | ")}` }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -165,7 +212,6 @@ Rules:
     }
     cleanCode = cleanCode.trim();
 
-    // Deduct credit for logged-in free users
     if (userId && !isPro && serviceRoleKey) {
       const adminClient = createClient(supabaseUrl, serviceRoleKey, {
         auth: { persistSession: false, autoRefreshToken: false },
