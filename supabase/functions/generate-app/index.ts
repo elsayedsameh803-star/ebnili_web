@@ -10,11 +10,6 @@ const GEMINI_MODELS = [
   "gemini-3.5-flash-lite",
   "gemini-3.6-flash",
   "gemini-3.5-flash",
-  "gemini-2.5-flash-lite",
-  "gemini-2.0-flash-lite",
-  "gemini-2.5-flash",
-  "gemini-2.0-flash",
-  "gemini-1.5-flash",
 ];
 
 interface GenerateRequest {
@@ -135,52 +130,45 @@ Rules:
     for (const model of GEMINI_MODELS) {
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
 
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          const res = await fetch(geminiUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(requestBody),
-          });
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 25000);
 
-          if (res.ok) {
-            geminiResponse = res;
-            break;
-          }
+        const res = await fetch(geminiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal,
+        });
 
-          const errorText = await res.text();
-          let modelError = "";
-          try {
-            const errJson = JSON.parse(errorText);
-            modelError = errJson?.error?.message ?? errorText;
-          } catch {
-            modelError = errorText;
-          }
+        clearTimeout(timeoutId);
 
-          if (attempt === 0) {
-            allErrors.push(`${model}: ${modelError}`);
-          }
-          lastError = modelError;
-          console.error(`Model ${model} attempt ${attempt + 1} failed:`, modelError);
-
-          if (modelError.includes("API key not valid")) {
-            break;
-          }
-
-          if (modelError.includes("high demand") && attempt === 0) {
-            await new Promise((r) => setTimeout(r, 3000));
-            continue;
-          }
-          break;
-        } catch (fetchErr) {
-          const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
-          allErrors.push(`${model}: ${msg}`);
-          lastError = msg;
-          console.error(`Model ${model} fetch error:`, msg);
+        if (res.ok) {
+          geminiResponse = res;
           break;
         }
+
+        const errorText = await res.text();
+        let modelError = "";
+        try {
+          const errJson = JSON.parse(errorText);
+          modelError = errJson?.error?.message ?? errorText;
+        } catch {
+          modelError = errorText;
+        }
+        allErrors.push(`${model}: ${modelError}`);
+        lastError = modelError;
+        console.error(`Model ${model} failed:`, modelError);
+
+        if (modelError.includes("API key not valid")) {
+          break;
+        }
+      } catch (fetchErr) {
+        const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+        allErrors.push(`${model}: ${msg}`);
+        lastError = msg;
+        console.error(`Model ${model} fetch error:`, msg);
       }
-      if (geminiResponse) break;
     }
 
     if (!geminiResponse) {

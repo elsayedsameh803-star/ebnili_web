@@ -30,7 +30,7 @@ export async function streamGenerate(
   const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase is not configured');
+    throw new Error('Supabase is not configured. Check your .env file.');
   }
 
   const { data: sessionData } = await supabase.auth.getSession();
@@ -49,23 +49,37 @@ export async function streamGenerate(
     headers['Authorization'] = `Bearer ${accessToken}`;
   }
 
-  const response = await fetch(`${supabaseUrl}/functions/v1/generate-app`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ prompt, templateType }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 55000);
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(errorData.error || `Generation failed (${response.status})`);
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/generate-app`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ prompt, templateType }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.error || `Generation failed (${response.status})`);
+    }
+
+    const data = await response.json();
+
+    if (!data.code) {
+      throw new Error('No code received from AI');
+    }
+
+    callbacks.onStatus('Done');
+    return data.code as string;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('The AI engine took too long to respond. Please try again.');
+    }
+    throw err;
   }
-
-  const data = await response.json();
-
-  if (!data.code) {
-    throw new Error('No code received from AI');
-  }
-
-  callbacks.onStatus('Done');
-  return data.code as string;
 }
