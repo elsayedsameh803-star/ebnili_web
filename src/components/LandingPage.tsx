@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Sparkles,
   Zap,
@@ -7,11 +7,7 @@ import {
   Check,
   Code2,
   Eye,
-  Smartphone,
-  Tablet,
-  Monitor,
   Download,
-  Share2,
   History,
   Shield,
   Rocket,

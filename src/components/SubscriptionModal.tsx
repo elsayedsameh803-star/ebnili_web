@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import {
-  X, Check, Sparkles, Zap, Crown, Smartphone, ArrowRight, Loader2, ShieldCheck,
+  X, Check, Zap, Crown, Smartphone, ArrowRight, Loader2, ShieldCheck,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { PRICING, ORANGE_CASH_NUMBER, type SubscriptionTier, type Profile } from '@/lib/types';
+import { PRICING, ORANGE_CASH_NUMBER, type SubscriptionTier } from '@/lib/types';
 import { useAuth } from '@/lib/auth';
 
 interface SubscriptionModalProps {

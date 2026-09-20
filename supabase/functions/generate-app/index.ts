@@ -124,7 +124,6 @@ Rules:
     };
 
     let geminiResponse: Response | null = null;
-    let lastError = "";
     const allErrors: string[] = [];
 
     for (const model of GEMINI_MODELS) {
@@ -157,7 +156,6 @@ Rules:
           modelError = errorText;
         }
         allErrors.push(`${model}: ${modelError}`);
-        lastError = modelError;
         console.error(`Model ${model} failed:`, modelError);
 
         if (modelError.includes("API key not valid")) {
@@ -166,7 +164,6 @@ Rules:
       } catch (fetchErr) {
         const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
         allErrors.push(`${model}: ${msg}`);
-        lastError = msg;
         console.error(`Model ${model} fetch error:`, msg);
       }
     }
